@@ -1,0 +1,36 @@
+---
+
+- name: Setup client
+  vars:
+    client_opts: "{{ gz_ansible_config.client | combine(opts_client,recursive=True) }}"
+  block:
+  - debug: var=client_opts
+  - ansible.builtin.group:
+      name: "{{client_opts.group}}"
+  - ansible.builtin.user:
+      force: yes
+      append: yes
+      name: "{{client_opts.group}}"
+      group: "{{client_opts.user}}"
+      shell: "{{client_opts.shell}}"
+      home: "{{client_opts.home}}"
+  - ansible.builtin.file:
+      path: "{{client_opts.home}}/.ssh"
+      state: directory
+      owner: "{{client_opts.user}}"
+      group: "{{client_opts.group}}"
+      mode: "755"
+  - ansible.builtin.copy:
+      force: yes
+      backup: yes
+      src: "{{client_opts.authorized_keys_file}}"
+      dest: /home/{{client_opts.user}}/.ssh/authorized_keys
+      owner: "{{client_opts.user}}"
+      group: "{{client_opts.group}}"
+      mode: "{{600}}"
+  - name: sudo
+    ansible.builtin.lineinfile:
+      path: /etc/sudoers
+      regexp: "^{{client_opts.user}}"
+      line: "{{client_opts.user}} ALL=(ALL:ALL) NOPASSWD: ALL"
+      validate: 'visudo -cf %s'

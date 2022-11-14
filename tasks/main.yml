@@ -1,0 +1,12 @@
+---
+
+- name: Check
+  tags: [check, gz_ansible_check]
+  block:
+  - debug: var=gz_ansible_config
+  - debug: var=opts
+
+- {name: Apt ,when: opts.apt is defined ,vars: {opts_apt: "{{ opts.apt | combine(gz_ansible_config.apt,recursive=True) }}"} ,include_role: {name: gz_apt} }
+
+- {name: Client ,when: opts.client is defined ,vars: {opts_client: "{{ opts.client}}"} ,include_tasks: client.yml }
+- {name: Master ,when: opts.master is defined ,vars: {opts_master: "{{ opts.master}}"} ,include_tasks: master.yml }

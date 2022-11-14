@@ -1,0 +1,151 @@
+---
+
+- name: Prepare opts_master
+  block:
+  - set_fact:
+      opts_master: "{{ opts.master | combine(gz_ansible_config.master,recursive=True) }}"
+  - debug: var=opts_master
+
+- include_role: {name: gz_common ,tasks_from: mounts_v2}
+- {command: mount -a ,args: {warn: no} }
+
+- name: Copy files
+  tags: [xnever]
+  #when: opts_master.roles is defined
+  #debug: var=xx
+  vars:
+    role_txt:
+    - -a
+    opts_0:
+      - --usermap=*:{{opts_master.user}}
+      - --groupmap=*:{{opts_master.group}}
+      - --chmod=F{{opts_master.filemode}},D{{opts_master.dirmode}}
+      - --no-motd                     #No message of the day
+      - -avhr
+      - --prune-empty-dirs 
+      - --delete-excluded
+      - --include={{opts_master.id}}
+      #- --include=keys/{{opts_master.id}}/
+      - --include=data/{{opts_master.id}}/
+      - --include=pb/_*
+      - --include=pb/{{opts_master.id}}_*
+    #opts_1: "{{ ['--include=/pb/roles/'] | product(opts_master.roles) | map('join') | list }}"
+    opts_1: "{{ ['--include=/roles/'] | product(opts_master.roles) | map('join') | list }}"
+    opts_2:
+    - --exclude=/*/*/
+    #sync:
+    #  src: "{{opts_master.src}}"
+    #  dest: "{{opts_master.dst}}"
+    #  rsync_opts: "{{ opts_0 + opts_1 + opts_2 }}"
+  block:
+  #- debug: var=sync
+  #- synchronize: "{{sync}}"
+  - synchronize:
+      src: "{{opts_master.src}}"
+      dest: "{{opts_master.dst}}"
+      rsync_opts: "{{ opts_0 + opts_1 + opts_2 }}"
+
+- name: Copy keys
+  tags: [xnever]
+  synchronize:
+    src: "{{opts_master.src}}/keys/"
+    dest: "{{opts_master.dst}}/keys/"
+    recursive: yes
+    delete: yes
+    rsync_opts:
+      - "--delete-excluded"
+      - --usermap=*:ansible
+      - --groupmap=*:ansible
+      - "--chmod=D0744,F0600"
+
+
+
+
+
+
+- name: Copy with find
+  tags: [never]
+  vars:
+    patterns:
+    - "{{opts_master.id}}"
+    - "{{opts_master.id}}_*"
+    #- "_*"
+    - "pb/_*"
+    - "pb/{{opts_master.id}}_*"
+    - "data/{{opts_master.id}}/*"
+  block:
+  - debug: var=patterns
+      
+  - name: Get file list
+    tags: [never]
+    local_action:
+      module: ansible.builtin.find
+      #file_type: file
+      recurse: yes
+      paths:
+      - "{{opts_master.src}}"
+      #- "{{opts_master.src}}pb/roles/common/"
+      patterns: "{{patterns}}"
+    register: output
+  - name: Show file list
+    vars:
+      files: "{{ output.files | map(attribute='path') | list }}"
+    debug: var=files
+    
+
+- name: Copy files
+  tags: [never]
+  block:
+  #- name: Clean up
+  #  command: rm -r {{opts_master.dst}}
+  - name: Copy roles
+    when: opts_master.roles is defined
+    #loop: "{{opts_master.roles}}"
+    copy:
+      src: "{{opts_master.src}}"
+      dest: "{{opts_master.dst}}"
+    with_fileglob:
+    - "{{opts_master.src}}{{opts_master.id}}*"
+    - "{{opts_master.src}}pb/{{opts_master.id}}_*"
+    #- "{{opts_master.src}}*"
+  
+
+- name: Copy playbook, roles & data files
+  tags: [never]
+  vars:
+    options:
+      src: "{{opts_master.src}}"
+      dest: "{{opts_master.dst}}"
+      #archive: no
+      #times: yes
+      #recursive: yes
+      #delete: yes
+      rsync_opts:
+      - --usermap=*:{{opts_master.username}}
+      - --groupmap=*:{{opts_master.usergroup}}
+      - --chmod=F{{opts_master.filemode}},D{{opts_master.dirmode}}
+      - --delete-excluded
+      - -am                           #Prunes empty dirs
+      - --include={{opts_master.group}}
+      - --include=pb/*.yml
+      #- --include=pb/roles/***
+      #- --include=data/{{opts_master.group}}/***   #Project's data
+      #- --exclude=*
+  #debug: var=options
+  synchronize: "{{options}}"
+
+- name: Copy files
+  tags: [never]
+  synchronize:
+    src: "{{ansible_config.master.src}}/"
+    dest: "{{ansible_config.master.dst}}"
+    recursive: yes
+    delete: yes
+    rsync_opts:
+      - "--delete-excluded"
+      - "--exclude=keys"
+      - --usermap=*:ansible
+      - --groupmap=*:ansible
+      - "--chmod=F{{0744}},D{{0755}}"
+
+  

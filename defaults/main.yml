@@ -1,0 +1,30 @@
+---
+
+gz_ansible_config:
+  apt:
+    #sources:
+      #files:
+    #key_urls: []
+    #key_ids: []
+    #repos: []
+    pkg:
+    - python3
+    - python3-pymysql       #For DB backup
+    - python3-setuptools
+    - python3-dev
+    - python3-mysqldb
+    - python3-pip
+    #- python3-semanage      #For [sftp_johanmeiring 
+    - p7zip-full            #For backup/restore
+  client:
+    user: ansible
+    group: ansible
+    shell: /bin/bash
+    home: /home/ansible
+  master:
+    src: /home/ansible/dev/ansible/
+    dst: /home/ansible/an/
+    user: ansible
+    group: ansible
+    filemode: '0744'
+    dirmode: '0755'
